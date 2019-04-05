@@ -17,43 +17,19 @@ from playhouse.sqlite_ext import *
 
 import credentials
 
-
-# Blog configuration values.
-
-# You may consider using a one-way hash to generate the password, and then
-# use the hash again in the login view to perform the comparison. This is just
-# for simplicity.
 ADMIN_PASSWORD = credentials.admin_password
 APP_DIR = os.path.dirname(os.path.realpath(__file__))
-
-# The playhouse.flask_utils.FlaskDB object accepts database URL configuration.
 DATABASE = 'sqliteext:///%s' % os.path.join(APP_DIR, 'blog.db')
 DEBUG = False
-
-# The secret key is used internally by Flask to encrypt session data stored
-# in cookies. Make this unique for your app.
-SECRET_KEY = 'shhh, secret!'
-
-# This is used by micawber, which will attempt to generate rich media
-# embedded objects with maxwidth=800.
+SECRET_KEY = os.urandom(12)
 SITE_WIDTH = 800
 
 
-# Create a Flask WSGI app and configure it using values from the module.
 app = Flask(__name__)
 app.config.from_object(__name__)
 
-# FlaskDB is a wrapper for a peewee database that sets up pre/post-request
-# hooks for managing database connections.
 flask_db = FlaskDB(app)
-
-# The `database` is the actual peewee database, as opposed to flask_db which is
-# the wrapper.
 database = flask_db.database
-
-# Configure micawber with the default OEmbed providers (YouTube, Flickr, etc).
-# We'll use a simple in-memory cache so that multiple requests for the same
-# video don't require multiple network requests.
 oembed_providers = bootstrap_basic(OEmbedCache())
 
 
@@ -92,9 +68,6 @@ class Entry(flask_db.Model):
         return ret
 
     def update_search_index(self):
-        # Create a row in the FTSEntry table with the post content. This will
-        # allow us to use SQLite's awesome full-text search extension to
-        # search our entries.
         exists = (FTSEntry
                   .select(FTSEntry.docid)
                   .where(FTSEntry.docid == self.id)
@@ -127,9 +100,6 @@ class Entry(flask_db.Model):
         else:
             search = ' '.join(words)
 
-        # Query the full-text search index for entries matching the given
-        # search query, then join the actual Entry data on the matching
-        # search result.
         return (Entry
                 .select(Entry, FTSEntry.rank().alias('score'))
                 .join(FTSEntry, on=(Entry.id == FTSEntry.docid))
@@ -157,8 +127,6 @@ def login():
     next_url = request.args.get('next') or request.form.get('next')
     if request.method == 'POST' and request.form.get('password'):
         password = request.form.get('password')
-        # TODO: If using a one-way hash, you would also hash the user-submitted
-        # password and do the comparison on the hashed versions.
         if password == app.config['ADMIN_PASSWORD']:
             session['logged_in'] = True
             session.permanent = True  # Use cookie to store session.
@@ -183,10 +151,6 @@ def index():
     else:
         query = Entry.public().order_by(Entry.timestamp.desc())
 
-    # The `object_list` helper will take a base query and then handle
-    # paginating the results if there are more than 20. For more info see
-    # the docs:
-    # http://docs.peewee-orm.com/en/latest/peewee/playhouse.html#object_list
     return object_list(
         'index.html',
         query,
@@ -201,8 +165,6 @@ def _create_or_edit(entry, template):
         if not (entry.title and entry.content):
             flash('Title and Content are required.', 'danger')
         else:
-            # Wrap the call to save in a transaction so we can roll it back
-            # cleanly in the event of an integrity error.
             try:
                 with database.atomic():
                     entry.save()
@@ -245,11 +207,6 @@ def edit(slug):
 
 @app.template_filter('clean_querystring')
 def clean_querystring(request_args, *keys_to_remove, **new_values):
-    # We'll use this template filter in the pagination include. This filter
-    # will take the current URL and allow us to preserve the arguments in the
-    # querystring while replacing any that we need to overwrite. For instance
-    # if your URL is /?q=search+query&page=2 and we want to preserve the search
-    # term but make a link to page 3, this filter will allow us to do that.
     querystring = dict((key, value) for key, value in request_args.items())
     for key in keys_to_remove:
         querystring.pop(key, None)
