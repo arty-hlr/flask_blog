@@ -205,6 +205,10 @@ def edit(slug):
     entry = get_object_or_404(Entry, Entry.slug == slug)
     return _create_or_edit(entry, 'edit.html')
 
+@app.route('/bio/')
+def bio():
+        return render_template('bio.html')
+
 @app.template_filter('clean_querystring')
 def clean_querystring(request_args, *keys_to_remove, **new_values):
     querystring = dict((key, value) for key, value in request_args.items())
