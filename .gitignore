@@ -1,3 +1,4 @@
 blog/*
 */credentials.py
 */blog.db
+*/__pycache__/
