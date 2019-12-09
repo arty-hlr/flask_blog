@@ -3,6 +3,7 @@ import functools
 import os
 import re
 import urllib
+import hashlib
 
 from flask import (Flask, flash, Markup, redirect, render_template, request,
                    Response, session, url_for)
@@ -17,7 +18,8 @@ from playhouse.sqlite_ext import *
 
 import credentials
 
-ADMIN_PASSWORD = credentials.admin_password
+ADMIN_USERNAME = credentials.username
+ADMIN_HASH = credentials.admin_hash
 APP_DIR = os.path.dirname(os.path.realpath(__file__))
 DATABASE = 'sqliteext:///%s' % os.path.join(APP_DIR, 'blog.db')
 DEBUG = False
@@ -33,10 +35,15 @@ database = flask_db.database
 oembed_providers = bootstrap_basic(OEmbedCache())
 
 
+class Category(flask_db.Model):
+    name = CharField(unique=True)
+    number = IntegerField()
+
 class Entry(flask_db.Model):
     title = CharField()
     slug = CharField(unique=True)
     content = TextField()
+    category = CharField()
     published = BooleanField(index=True)
     timestamp = DateTimeField(default=datetime.datetime.now, index=True)
 
@@ -64,6 +71,7 @@ class Entry(flask_db.Model):
         ret = super(Entry, self).save(*args, **kwargs)
 
         # Store search content.
+        self.update_category()
         self.update_search_index()
         return ret
 
@@ -82,6 +90,14 @@ class Entry(flask_db.Model):
             FTSEntry.insert({
                 FTSEntry.docid: self.id,
                 FTSEntry.content: content}).execute()
+
+    def update_category(self):
+        if self.published:
+            Category.update({Category.number: Category.number+1}).where(Category.name == self.category).execute()
+
+    @classmethod
+    def only_category(cls,cat):
+        return Entry.select().where(Entry.category == cat,Entry.published == True)
 
     @classmethod
     def public(cls):
@@ -125,15 +141,17 @@ def login_required(fn):
 @app.route('/login/', methods=['GET', 'POST'])
 def login():
     next_url = request.args.get('next') or request.form.get('next')
-    if request.method == 'POST' and request.form.get('password'):
+    if request.method == 'POST' and request.form.get('username') and request.form.get('password'):
+        username = request.form.get('username')
         password = request.form.get('password')
-        if password == app.config['ADMIN_PASSWORD']:
+        hashed_password = hashlib.sha512(password.encode()).hexdigest()
+        if username == app.config['ADMIN_USERNAME'] and hashed_password == app.config['ADMIN_HASH']:
             session['logged_in'] = True
             session.permanent = True  # Use cookie to store session.
             flash('You are now logged in.', 'success')
             return redirect(next_url or url_for('index'))
         else:
-            flash('Incorrect password.', 'danger')
+            flash('Incorrect credentials.', 'danger')
     return render_template('login.html', next_url=next_url)
 
 @app.route('/logout/', methods=['GET', 'POST'])
@@ -143,6 +161,24 @@ def logout():
         return redirect(url_for('login'))
     return render_template('logout.html')
 
+@app.route('/categories/')
+def categories():
+    query = Category.select().where(Category.number != 0).order_by(Category.name)
+    return object_list(
+        'categories.html',
+        query,
+        check_bounds=False)
+
+@app.route('/category/<cat>/')
+def category(cat):
+    category = get_object_or_404(Category, Category.name == cat)
+    query = Entry.only_category(cat).order_by(Entry.timestamp.desc())
+    # raise(Exception)
+    return object_list(
+        'category.html',
+        query,
+        cat=cat)
+
 @app.route('/')
 def index():
     search_query = request.args.get('q')
@@ -151,6 +187,7 @@ def index():
     else:
         query = Entry.public().order_by(Entry.timestamp.desc())
 
+    # raise(Exception)
     return object_list(
         'index.html',
         query,
@@ -161,10 +198,16 @@ def _create_or_edit(entry, template):
     if request.method == 'POST':
         entry.title = request.form.get('title') or ''
         entry.content = request.form.get('content') or ''
+        entry.category = request.form.get('category') or ''
         entry.published = request.form.get('published') or False
-        if not (entry.title and entry.content):
-            flash('Title and Content are required.', 'danger')
+        if not (entry.title and entry.content and entry.category):
+            flash('Title, Content, and Category are required.', 'danger')
         else:
+            try:
+                category = Category.get(Category.name == request.form.get('category'))
+            except:
+                with database.atomic():
+                    category = Category.create(name=request.form.get('category'),number=0)
             try:
                 with database.atomic():
                     entry.save()
@@ -205,6 +248,10 @@ def edit(slug):
     entry = get_object_or_404(Entry, Entry.slug == slug)
     return _create_or_edit(entry, 'edit.html')
 
+@app.route('/about/')
+def about():
+        return render_template('about.html')
+
 @app.template_filter('clean_querystring')
 def clean_querystring(request_args, *keys_to_remove, **new_values):
     querystring = dict((key, value) for key, value in request_args.items())
@@ -218,7 +265,7 @@ def not_found(exc):
     return Response('<h3>Not found</h3>'), 404
 
 def main():
-    database.create_tables([Entry, FTSEntry], safe=True)
+    # database.create_tables([Entry, FTSEntry,Category], safe=True)
     app.run(debug=True)
 
 if __name__ == '__main__':

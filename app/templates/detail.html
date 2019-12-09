@@ -11,6 +11,7 @@
 {% endblock %}
 
 {% block content %}
-  <p>Created {{ entry.timestamp.strftime('%m/%d/%Y at %I:%M%p') }}</p>
+  <h4>Category: {{ entry.category }}</h4>
   {{ entry.html_content }}
+  <p>Created {{ entry.timestamp.strftime('%d/%m/%Y at %H:%M') }}</p>
 {% endblock %}
