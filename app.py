@@ -248,9 +248,18 @@ def edit(slug):
     entry = get_object_or_404(Entry, Entry.slug == slug)
     return _create_or_edit(entry, 'edit.html')
 
+@app.route('/<slug>/delete/')
+@login_required
+def delete(slug):
+    entry = Entry.get(Entry.slug == slug)
+    deleted_entry = entry.title
+    Category.update({Category.number: Category.number-1}).where(Category.name == entry.category).execute()
+    entry.delete_instance()
+    return render_template('deleted.html',deleted_entry=deleted_entry)
+
 @app.route('/about/')
 def about():
-        return render_template('about.html')
+    return render_template('about.html')
 
 @app.template_filter('clean_querystring')
 def clean_querystring(request_args, *keys_to_remove, **new_values):
