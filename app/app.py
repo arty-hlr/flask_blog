@@ -3,6 +3,7 @@ import functools
 import os
 import re
 import urllib
+import hashlib
 
 from flask import (Flask, flash, Markup, redirect, render_template, request,
                    Response, session, url_for)
@@ -17,7 +18,8 @@ from playhouse.sqlite_ext import *
 
 import credentials
 
-ADMIN_PASSWORD = credentials.admin_password
+ADMIN_USERNAME = credentials.username
+ADMIN_HASH = credentials.admin_hash
 APP_DIR = os.path.dirname(os.path.realpath(__file__))
 DATABASE = 'sqliteext:///%s' % os.path.join(APP_DIR, 'blog.db')
 DEBUG = False
@@ -139,15 +141,17 @@ def login_required(fn):
 @app.route('/login/', methods=['GET', 'POST'])
 def login():
     next_url = request.args.get('next') or request.form.get('next')
-    if request.method == 'POST' and request.form.get('password'):
+    if request.method == 'POST' and request.form.get('username') and request.form.get('password'):
+        username = request.form.get('username')
         password = request.form.get('password')
-        if password == app.config['ADMIN_PASSWORD']:
+        hashed_password = hashlib.sha512(password.encode()).hexdigest()
+        if username == app.config['ADMIN_USERNAME'] and hashed_password == app.config['ADMIN_HASH']:
             session['logged_in'] = True
             session.permanent = True  # Use cookie to store session.
             flash('You are now logged in.', 'success')
             return redirect(next_url or url_for('index'))
         else:
-            flash('Incorrect password.', 'danger')
+            flash('Incorrect credentials.', 'danger')
     return render_template('login.html', next_url=next_url)
 
 @app.route('/logout/', methods=['GET', 'POST'])
@@ -261,7 +265,7 @@ def not_found(exc):
     return Response('<h3>Not found</h3>'), 404
 
 def main():
-    database.create_tables([Entry, FTSEntry,Category], safe=True)
+    # database.create_tables([Entry, FTSEntry,Category], safe=True)
     app.run(debug=True)
 
 if __name__ == '__main__':
