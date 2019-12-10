@@ -7,3 +7,7 @@
 {% block form_action %}{{ url_for('edit', slug=entry.slug) }}{% endblock %}
 
 {% block save_button %}Save changes{% endblock %}
+
+{% block delete_entry %}
+  <a class="btn btn-warning" href="{{ url_for('delete', slug=entry.slug) }}">Delete</a>
+{% endblock %}
