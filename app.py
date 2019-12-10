@@ -274,7 +274,7 @@ def not_found(exc):
     return Response('<h3>Not found</h3>'), 404
 
 def main():
-    if not os.path.exists('blog.db'):
+    if not os.path.exists(os.path.join(APP_DIR,'blog.db')):
         database.create_tables([Entry, FTSEntry,Category], safe=True)
     app.run()
 
