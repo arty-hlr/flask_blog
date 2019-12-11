@@ -4,4 +4,5 @@ micawber
 pygments
 markdown
 peewee
+psycopg2
 gunicorn
