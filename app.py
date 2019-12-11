@@ -14,7 +14,6 @@ from micawber import bootstrap_basic, parse_html
 from micawber.cache import Cache as OEmbedCache
 from peewee import *
 from playhouse.flask_utils import FlaskDB, get_object_or_404, object_list
-# from playhouse.sqlite_ext import *
 from playhouse.postgres_ext import *
 from playhouse.db_url import connect
 
@@ -23,9 +22,6 @@ import credentials
 ADMIN_USERNAME = credentials.username
 ADMIN_HASH = credentials.admin_hash
 APP_DIR = os.path.dirname(os.path.realpath(__file__))
-# DATABASE = 'sqliteext:///%s' % os.path.join(APP_DIR, 'blog.db')
-# DATABASE = 'postgres:///%s' % os.path.join(APP_DIR, 'blog.db')
-# DATABASE = PostgresqlExtDatabase('blog-hlr', user='postgres', register_hstore=False)
 DATABASE = connect(os.environ.get('DATABASE_URL'))
 DEBUG = False
 SECRET_KEY = credentials.session_key
@@ -75,26 +71,8 @@ class Entry(flask_db.Model):
             self.slug = re.sub('[^\w]+', '-', self.title.lower()).strip('-')
         ret = super(Entry, self).save(*args, **kwargs)
 
-        # Store search content.
         self.update_category()
-        # self.update_search_index()
         return ret
-
-    # def update_search_index(self):
-    #     exists = (FTSEntry
-    #               .select(FTSEntry.docid)
-    #               .where(FTSEntry.docid == self.id)
-    #               .exists())
-    #     content = '\n'.join((self.title, self.content))
-    #     if exists:
-    #         (FTSEntry
-    #          .update({FTSEntry.content: content})
-    #          .where(FTSEntry.docid == self.id)
-    #          .execute())
-    #     else:
-    #         FTSEntry.insert({
-    #             FTSEntry.docid: self.id,
-    #             FTSEntry.content: content}).execute()
 
     def update_category(self):
         if self.published:
@@ -125,12 +103,6 @@ class Entry(flask_db.Model):
                 .where(
                     Match(Entry.content,search) &
                     (Entry.published == True)))
-
-# class FTSEntry(FTSModel):
-#     content = TextField()
-
-#     class Meta:
-#         database = database
 
 def login_required(fn):
     @functools.wraps(fn)
@@ -278,7 +250,6 @@ def not_found(exc):
 def main():
     app.run()
 
-# if not os.path.exists(os.path.join(APP_DIR,'blog.db')):
 database.create_tables([Entry,Category], safe=True)
 
 if __name__ == '__main__':
