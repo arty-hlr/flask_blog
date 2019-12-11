@@ -33,8 +33,6 @@ app.config.from_object(__name__)
 flask_db = FlaskDB(app)
 database = flask_db.database
 oembed_providers = bootstrap_basic(OEmbedCache())
-if not os.path.exists(os.path.join(APP_DIR,'blog.db')):
-    database.create_tables([Entry, FTSEntry,Category], safe=True)
 
 
 class Category(flask_db.Model):
@@ -277,6 +275,9 @@ def not_found(exc):
 
 def main():
     app.run()
+
+if not os.path.exists(os.path.join(APP_DIR,'blog.db')):
+    database.create_tables([Entry, FTSEntry,Category], safe=True)
 
 if __name__ == '__main__':
     main()
