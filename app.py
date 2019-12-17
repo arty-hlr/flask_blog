@@ -174,6 +174,7 @@ def _create_or_edit(entry, template):
         entry.content = request.form.get('content') or ''
         entry.category = request.form.get('category') or ''
         entry.published = request.form.get('published') or False
+        preview = request.form.get('preview') or False
         if not (entry.title and entry.content and entry.category):
             flash('Title, Content, and Category are required.', 'danger')
         else:
@@ -189,7 +190,7 @@ def _create_or_edit(entry, template):
                 flash('Error: this title is already in use.', 'danger')
             else:
                 flash('Entry saved successfully.', 'success')
-                if entry.published:
+                if entry.published or preview:
                     return redirect(url_for('detail', slug=entry.slug))
                 else:
                     return redirect(url_for('edit', slug=entry.slug))
